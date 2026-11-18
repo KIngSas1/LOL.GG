@@ -1,42 +1,40 @@
-name: Build mod
+
+name: Extract Minecraft Source
 
 on:
   push:
     branches: [main, master]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
-  build:
+  extract:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 21
-
-      - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '9.2.1'
-
-      - name: Unzip and build every zip in the repo
+      - name: Extract ZIP
         run: |
-          mkdir -p dist
-          for z in *.zip; do
-            n="${z%.zip}"
-            mkdir -p "work/$n"
-            unzip -q -o "$z" -d "work/$n"
-            gradle_file=$(find "work/$n" -name settings.gradle | head -n 1)
-            dir=$(dirname "$gradle_file")
-            (cd "$dir" && gradle build --no-daemon)
-          done
-          find work -name '*.jar'
-          find work -path '*/build/libs/*.jar' ! -name '*-sources.jar' -exec cp {} dist/ \;
-          ls -l dist
+          rm -rf extracted-source
+          mkdir -p extracted-source
+          unzip -q orchard-1.21.11-kinda-src.zip -d extracted-source
 
-      - uses: actions/upload-artifact@v4
+      - name: Commit extracted source
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A extracted-source
+
+          if ! git diff --cached --quiet; then
+            git commit -m "Extract Minecraft source"
+            git push
+          fi
+
+      - name: Upload extracted source
+        uses: actions/upload-artifact@v4
         with:
-          name: mod-jars
-          path: dist/*.jar
-          if-no-files-found: error
+          name: extracted-source
+          path: extracted-source/
